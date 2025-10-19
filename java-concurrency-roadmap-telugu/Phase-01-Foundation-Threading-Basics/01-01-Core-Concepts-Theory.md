@@ -187,3 +187,185 @@ gantt
 
 ### ➡️ Next Step
 Baga nerchukunnam ra! 🎉 Ee core concepts (Process, Thread, Concurrency, Parallelism) ippudu clear ga unnai anukuntunna. Tarvata manam **"1.2 Creating & Managing Threads in Java"** ki veldam. Ippudu ee foundation tho, actual ga Java lo threads ni ela create cheyalo, ela manage cheyalo chuddam! 🔥
+
+---
+---
+
+## 🏗️ JVM Thread Architecture & Java Memory Model (JMM)
+
+**Problem Statement:**
+Manam mundu `Thread` anedi `Process` yokka memory ni share cheskuntundi ani cheppukunnam. But, aa memory ela organize cheyabaddadi? Prathi thread ki sonta memory emaina untada? Rendu threads okate variable ni access cheste emavutundi? Ee questions ki answer JVM architecture lo undi.
+
+**Solution:**
+JVM prathi application kosam oka memory area ni reserve chestundi. Ee memory area rendu main parts ga divide cheyabaddadi:
+1.  **Heap Memory:** Idi antha application ki okate untadi. Anni threads ee memory ni share cheskuntai. Manam `new` keyword tho create chese anni objects ikkade store avutai.
+2.  **Thread Stack:** Prathi thread ki sonta (private) stack memory untadi. Ee memory ni vere threads chudaleyavu. Deentlo aa thread execute chese methods, local variables, and method call information store avutai.
+
+**Real-World Analogy: 🏢 A Library**
+
+-   **Heap Memory (Main Library Hall):** Library lo unna main hall anukondi. Andulo unna books anni (`Objects`) andariki (anni `Threads` ki) accessible. Evaraina vachi aa books ni teskovachu, chadavachu.
+-   **Thread Stack (Personal Study Desk):** Prathi person (Thread) ki oka personal study desk untadi. Vallu aa desk meeda వాళ్ళ sonta notes (`local variables`), current chadvutunna book (`method call`) pettukuntaru. Ee desk private; pakkana unna person direct ga vachi nee desk lo chudaru.
+
+---
+
+### 🧠 Mental Model Diagram: JVM Memory
+
+```mermaid
+graph TD
+    subgraph JVM Memory
+        subgraph Shared Between All Threads
+            Heap_Memory[Heap Memory <br> (All Objects Live Here)]
+            Method_Area[Method Area <br> (Class Level Data, Static Variables)]
+        end
+
+        subgraph Thread-1 Private Memory
+            T1_Stack[Thread-1 Stack <br> (Local Variables, Method Calls)]
+            T1_PC[PC Registers]
+        end
+
+        subgraph Thread-2 Private Memory
+            T2_Stack[Thread-2 Stack <br> (Local Variables, Method Calls)]
+            T2_PC[PC Registers]
+        end
+
+        T1_Stack -- Interacts with --> Heap_Memory
+        T2_Stack -- Interacts with --> Heap_Memory
+    end
+
+    style Heap_Memory fill:#c7ecee
+    style Method_Area fill:#c7ecee
+    style T1_Stack fill:#ffeaa7
+    style T2_Stack fill:#ffeaa7
+```
+
+**Explanation:**
+-   **Heap & Method Area:** Ee rendu areas anni threads madhya common. `Thread-1` create chesina `new User()` object ni `Thread-2` kuda access cheyagaladu, endukante adi Heap lo untadi.
+-   **Thread Stack:** Prathi thread ki sonta stack untadi. `Thread-1` lo unna `int x = 10;` (local variable) anedi `Thread-2` ki kanipinchadu.
+-   **PC Registers:** Prathi thread ki oka Program Counter (PC) register untadi. Idi next ഏ instruction execute cheyalo track chestundi.
+
+---
+
+### 🔥 The Java Memory Model (JMM)
+
+JMM anedi oka abstract concept. Idi Java threads, memory tho ela interact avtayo cheppe rules and guarantees set. Main ga idi **Visibility** and **Ordering** problems ni solve cheyadaniki try chestundi.
+
+-   **Problem 1: Visibility:**
+    Oka core (CPU-1) mida run ayye `Thread-1`, `sharedVariable = 10` ani set chesindi anukundam. Inko core (CPU-2) mida run ayye `Thread-2` aa `sharedVariable` ni chuste, daaniki `10` kanipinchali kada? Kaani, performance kosam, prathi core ki sonta cache untadi. `Thread-1` chesina change, daani cache lo undi, main memory (RAM) ki vellakapovachu. So, `Thread-2` ki inka old value (e.g., `0`) kanipinchachu. **This is a visibility problem.**
+
+-   **Problem 2: Instruction Reordering:**
+    Performance kosam, compiler and CPU, manam rasina code order ni marchaesi, vere order lo execute cheyochu. Single thread lo idi problem kaadu, but multi-threaded environment lo idi pedda a disaster avvochu.
+
+**JMM Solution:**
+JMM ee problems ni solve cheyadaniki `synchronized`, `volatile`, and `final` lanti keywords use chesi konni guarantees (happens-before relationship) isthundi.
+
+📌 **Coming Up:** JMM, Visibility, Reordering, `volatile` and `synchronized` gurinchi manam **Phase 2** lo chala detailed ga matladukuntam. Ippatiki, prathi thread ki sonta stack and anni threads ki common heap untadi anedi gurthupettukunte chalu.
+
+---
+---
+
+## 🚦 Thread Lifecycle & States
+
+Oka thread anedi create ayyinappati nunchi, adi complete ayye varaku, chala different states (stithulu) lo untundi. Ee states ni ardham cheskovadam, debugging ki chala help avutundi.
+
+**Analogy: 👶 A Person's Life**
+-   **NEW:** Just born baby (puttadam).
+-   **RUNNABLE:** School ki velladaniki ready ga unna student (pani cheyadaniki ready).
+-   **RUNNING:** Office lo pani chestunna employee (actually doing work).
+-   **BLOCKED/WAITING:** Bus kosam waiting, or doctor appointment kosam waiting (verey vaalla kosam aagadam).
+-   **TERMINATED:** Life cycle complete (chanipovadam).
+
+---
+
+### 🧠 Mental Model Diagram: Thread States
+
+```mermaid
+stateDiagram-v2
+    [*] --> NEW: Thread t = new Thread()
+    NEW --> RUNNABLE: t.start()
+
+    state fork_state <<fork>>
+    RUNNABLE --> fork_state
+
+    fork_state --> RUNNING: Thread Scheduler allocates CPU
+    RUNNING --> RUNNABLE: Thread.yield() or Scheduler decides
+
+    RUNNING --> TIMED_WAITING: Thread.sleep(millis), t.join(millis), wait(millis)
+    TIMED_WAITING --> RUNNABLE: Timeout expires or notify()
+
+    RUNNING --> WAITING: t.join(), wait()
+    WAITING --> RUNNABLE: Other thread finishes or notify()
+
+    RUNNING --> BLOCKED: Enters synchronized block
+    BLOCKED --> RUNNABLE: Acquires lock
+
+    RUNNING --> TERMINATED: run() method completes
+
+    TERMINATED --> [*]
+```
+
+### 📚 Detailed Explanation of States
+
+1.  **`NEW`**
+    -   **Entidi:** Thread object create aindi, kaani inka `start()` method call cheyaledu.
+    -   **Analogy:** Car tayaru aindi, kaani inka engine start cheyaledu.
+    -   **Code:** `Thread t = new Thread(myRunnable);`
+
+2.  **`RUNNABLE`**
+    -   **Entidi:** `start()` method call chesaka, thread ee state ki vastundi. Idi ante, thread pani cheyadaniki ready ga undi, kaani thread scheduler inka deeniki CPU time ivvaledu.
+    -   **Analogy:** Race start aindi, runner start line daggara ready ga unnadu, whistle kosam waiting.
+    -   **Code:** `t.start();`
+
+3.  **`RUNNING`**
+    -   **Entidi:** Idi `RUNNABLE` state lo oka sub-state anukovachu. Thread scheduler CPU ni ee thread ki assign chesinapudu, adi `run()` method lo unna code ni execute cheyadam start chestundi.
+    -   **Note:** Java Thread API lo `RUNNING` ane separate state ledu. `RUNNABLE` lone idi include aipotundi. Kaani conceptually, idi veru.
+
+4.  **`BLOCKED` / `WAITING` / `TIMED_WAITING`** (Non-Runnable States)
+    -   Ee states lo unna thread, CPU time unna kuda pani cheyadu. Adi vere edaina event kosam wait chestu untundi.
+    -   **`BLOCKED`:** Oka thread, `synchronized` block/method loki enter avvadaniki try chesi, aa lock already vere thread daggara unte, `BLOCKED` state ki veltundi.
+    -   **`WAITING`:** Oka thread vere thread mida `join()` call chesinapudu, or `Object.wait()` call chesinapudu ee state ki veltundi. Adi vere thread nunchi signal (`notify()`) vachetanta varaku wait chestundi.
+    -   **`TIMED_WAITING`:** `Thread.sleep()`, `t.join(millis)`, `Object.wait(millis)` lanti methods call chesinapudu, thread ee state ki veltundi. Adi antha time aipoyaka or signal vachaka, malli `RUNNABLE` state ki veltundi.
+
+5.  **`TERMINATED`**
+    -   **Entidi:** Thread yokka `run()` method execution antha aipoyaka (normally or due to an exception), thread ee state ki veltundi.
+    -   **Analogy:** Car journey aipoyindi, engine aapesaru.
+    -   Once a thread is terminated, it can never be started again. Malli `start()` call cheste `IllegalThreadStateException` vastundi.
+---
+---
+
+## 🔄 Context Switching & Thread Scheduling
+
+**Problem Statement:**
+Manam single-core CPU lo Concurrency achieve cheyochu ani cheppukunnam. Ante, CPU okate, kaani panulu (threads) chala unnai. CPU, ee threads anni okate sari run avutunnai ane illusion ela create chestundi? Oka thread nunchi inkoka thread ki ela switch avutundi? Ee process ni evaru control chestaru?
+
+**Solution:**
+Deeniki answer **Context Switching** and **Thread Scheduler**.
+
+---
+
+### 🔄 Context Switching
+
+-   **What is it?** Context switching anedi CPU ni oka thread (`T1`) nunchi inkoka thread (`T2`) ki marchadaniki jarige process.
+-   **How it works:**
+    1.  `T1` ni aapataniki mundu, OS `T1` yokka current state (daani PC register, stack pointer, etc. - daani "context") ni save chestundi.
+    2.  Tarvata, OS `T2` yokka previously saved context ni load chestundi.
+    3.  Ippudu `T2` execution resume avutundi, adi ekkada aagindo akkada nunchi.
+-   **Performance Cost:** Context switching anedi free kaadu. Deeniki kontha CPU time padutundi. Ee time lo, CPU actual ga ఏ pani (user work) cheyatledu. Anduke, ekkuva context switching unte, application performance debba tintundi.
+
+**Analogy: ♟️ A Chess Master Playing Multiple Games**
+-   Imagine oka chess grandmaster (`CPU`) okate sari 10 games (`threads`) aadutunnadu.
+-   Atanu Board-1 (`T1`) daggara unnadu, oka move vesadu.
+-   Ippudu atanu Board-2 (`T2`) ki vellali. Velladaniki mundu, atanu Board-1 yokka current situation antha (pieces ekkada unnai, etc.) gurtupettukovali (`save context of T1`).
+-   Board-2 daggara ki vellaka, atanu aa board yokka previous situation ni malli gurtu techukovali (`load context of T2`).
+-   Ee process of "remembering and recalling" the state of each board is **Context Switching**. Atanu board marchadaniki time padutundi, aa time lo atanu aatalo move em veyatledu.
+
+---
+
+### 🗓️ Thread Scheduler
+
+-   **Who is it?** Thread scheduler anedi JVM lo oka part. Idi ఏ `RUNNABLE` thread ki CPU ivvalo decide chestundi.
+-   **How it decides?** Idi chala factors mida depend avutundi:
+    -   **Thread Priority:** High priority unna threads ki ekkuva chance untadi.
+    -   **Scheduling Algorithm:** JVM and OS use chese algorithm batti untadi. Rendu common types:
+        1.  **Preemptive Scheduling:** High priority thread vachinapudu, scheduler low priority thread ni forceful ga aapi, high priority thread ki chance isthundi. (Java idi use chestundi).
+        2.  **Cooperative Scheduling:** Thread ade voluntarily ga CPU ni vadile varaku (e.g., `yield()` chesi or aagipoyi), scheduler daanini aagadu.
+-   **Not in our Control:** Thread scheduling anedi JVM and OS control lo untadi. Manam daanini direct ga control cheyalem. Manam priorities tho just oka hint matrame ivvagalam. Anduke, mana code "ee thread tarvata ade thread run avvali" lanti assumptions mida depend avvakudadu. 🔥

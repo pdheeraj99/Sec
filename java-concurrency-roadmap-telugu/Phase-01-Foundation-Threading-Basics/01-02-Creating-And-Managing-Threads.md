@@ -1211,6 +1211,67 @@ public class DownloadManager {
 ```
 Ee project tho, manam `Runnable` task ni ela define cheyali, prathi task ki oka kotha `Thread` ni ela create cheyali, and anni threads aipoyentha varaku `main` thread tho ela wait cheyinchalo (using `join`) anedi practically chusam.
 
+**Testing:** 🧪
+Multithreaded code ni test cheyadam konchem tricky, but chala important. Manam JUnit 5 use chesi oka simple unit test rasdam.
+
+**File 4: pom.xml (Updated)**
+```xml
+<!-- ... -->
+    <properties>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <junit.jupiter.version>5.8.2</junit.jupiter.version>
+    </properties>
+
+    <dependencies>
+        <!-- Dependency for JUnit 5 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- ... -->
+    </dependencies>
+<!-- ... -->
+```
+
+**File 5: src/test/java/com/downloader/FileDownloaderTest.java**
+```java
+package com.downloader;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * 🎯 FileDownloader class kosam simple unit test.
+ */
+class FileDownloaderTest {
+
+    @Test
+    void testFileDownloaderRuns() {
+        FileDownloader downloader = new FileDownloader("test-file.zip");
+        Thread testThread = new Thread(downloader);
+
+        final var exceptionHolder = new Object(){ Throwable e = null; };
+        testThread.setUncaughtExceptionHandler((thread, throwable) -> {
+            exceptionHolder.e = throwable;
+        });
+
+        testThread.start();
+
+        try {
+            testThread.join(10000); // 10 seconds timeout
+        } catch (InterruptedException e) {
+            fail("Test was interrupted.");
+        }
+
+        assertNull(exceptionHolder.e, "The FileDownloader thread threw an unexpected exception.");
+    }
+}
+```
+**Explanation:** Ee test lo, manam `FileDownloader` ni oka separate thread lo run chesi, adi aipoyenta varaku wait chestunnam. `UncaughtExceptionHandler` use chesi, aa thread lo emaina exceptions vachayo ledo check chestunnam. Ee test pass aithe, mana code basic ga correct ga run avutundi ani oka confidence vastundi.
+
 ---
 
 ### 🚀 Production-Grade Example
@@ -1376,6 +1437,135 @@ public class Exercise1 {
 </details>
 
 ---
+
+**Exercise 3 (Easy):** ⭐
+**Problem:** Oka thread ni create cheyandi. Aa thread yokka name ni "My-Custom-Thread" ga set cheyandi. Aa thread run ayinapudu, adi tana name ni "My name is: My-Custom-Thread" ani print cheyali.
+**Hints:** 💡
+-   `thread.setName()` method use cheyandi.
+-   `Thread.currentThread().getName()` use chesi, thread tana name ni access cheyochu.
+
+**Solution:**
+<details>
+<summary>Click to see solution</summary>
+
+```java
+public class Exercise3 {
+    public static void main(String[] args) {
+        Thread t = new Thread(() -> {
+            System.out.println("My name is: " + Thread.currentThread().getName());
+        });
+
+        t.setName("My-Custom-Thread");
+        t.start();
+    }
+}
+```
+</details>
+
+---
+
+**Exercise 4 (Medium):** ⭐⭐
+**Problem:** Rendu threads (`t1`, `t2`) create cheyandi. `t1` run ayinapudu, adi 1 nunchi 500 varaku unna numbers ni sum cheyali. `t2` run ayinapudu, adi 501 nunchi 1000 varaku unna numbers ni sum cheyali. `main` thread, ee rendu threads ni start chesi, avi rendu aipoyenta varaku wait cheyali. Final ga, `main` thread aa rendu sums ni kalipi, total sum (1 to 1000) ni print cheyali.
+**Hints:** 💡
+-   Rendu separate `Runnable` classes create cheyandi, prathi class lo sum ni store cheyadaniki oka instance variable pettandi.
+-   `main` thread lo `t1.join()` and `t2.join()` call cheyali.
+-   Rendu `Runnable` objects nunchi results ni get chesi, add cheyandi.
+
+**Solution:**
+<details>
+<summary>Click to see solution</summary>
+
+```java
+class Summer implements Runnable {
+    private final int start;
+    private final int end;
+    private long sum = 0;
+
+    public Summer(int start, int end) {
+        this.start = start;
+        this.end = end;
+    }
+
+    @Override
+    public void run() {
+        for (int i = start; i <= end; i++) {
+            sum += i;
+        }
+        System.out.println(Thread.currentThread().getName() + " calculated sum: " + sum);
+    }
+
+    public long getSum() {
+        return sum;
+    }
+}
+
+public class Exercise4 {
+    public static void main(String[] args) throws InterruptedException {
+        Summer summer1 = new Summer(1, 500);
+        Summer summer2 = new Summer(501, 1000);
+
+        Thread t1 = new Thread(summer1, "Summer-1");
+        Thread t2 = new Thread(summer2, "Summer-2");
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+        long totalSum = summer1.getSum() + summer2.getSum();
+        System.out.println("Total sum (1 to 1000) is: " + totalSum);
+    }
+}
+```
+</details>
+
+---
+
+**Exercise 5 (Hard):** ⭐⭐⭐
+**Problem:** Oka "Simple Timer" thread ni create cheyandi. Ee thread start ayinapudu, adi prathi second ki "Timer: X seconds" ani print cheyali (X = 1, 2, 3...). `main` thread, ee timer thread ni start chesi, 5 seconds aagi, aa timer thread ki interrupt signal pampali. Timer thread, interrupt signal receive cheskuni, "Timer was interrupted. Shutting down." ani print chesi, gracefully exit avvali.
+**Hints:** 💡
+-   Timer thread `run()` method lo `while (!Thread.currentThread().isInterrupted())` loop use cheyandi.
+-   Loop lopala `Thread.sleep(1000)` use cheyandi.
+-   `InterruptedException` ni catch chesi, `Thread.currentThread().interrupt()` ni call cheyadam marchipoku.
+
+**Solution:**
+<details>
+<summary>Click to see solution</summary>
+
+```java
+public class Exercise5 {
+    public static void main(String[] args) {
+        Thread timerThread = new Thread(() -> {
+            int seconds = 0;
+            while (!Thread.currentThread().isInterrupted()) {
+                seconds++;
+                System.out.println("Timer: " + seconds + " seconds");
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    System.out.println("Timer was interrupted. Shutting down.");
+                    // Restore the interrupted status
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        timerThread.start();
+
+        try {
+            // Let the timer run for 5 seconds
+            Thread.sleep(5500); // a little over 5s to ensure the 5th print
+        } catch (InterruptedException e) {
+            // ignore
+        }
+
+        System.out.println("Main thread is interrupting the timer.");
+        timerThread.interrupt();
+    }
+}
+```
+</details>
 
 **Exercise 2 (Medium):** ⭐⭐
 **Problem:** Oka program rayandi, adi oka thread ni start chestundi. Aa thread 10 seconds sleep avvali. Main thread, ee worker thread ni start chesi, "Waiting for worker thread to finish..." ani print chesi, worker thread aipoyenta varaku wait cheyali. Worker thread aipoyaka, "Worker thread finished!" ani print cheyali.
